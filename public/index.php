@@ -24,6 +24,11 @@ $paths = new Config\Paths();
 
 require rtrim($paths->systemDirectory, '\\/ ') . DIRECTORY_SEPARATOR . 'bootstrap.php';
 
+// Some hosting providers disable `putenv()` via php.ini (`disable_functions`).
+// CodeIgniter's DotEnv calls `putenv()` in the `CodeIgniter\\Config` namespace.
+// This shim prevents a fatal error by safely no-op'ing when `putenv()` is unavailable.
+require_once APPPATH . 'Config/PutenvShim.php';
+
 require_once SYSTEMPATH . 'Config/DotEnv.php';
 (new CodeIgniter\Config\DotEnv(ROOTPATH))->load();
 
