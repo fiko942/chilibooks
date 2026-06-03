@@ -42,7 +42,7 @@
             </div>
             <div class="toolbar transaction-actions">
                 <a class="btn ghost full" href="<?= site_url('transactions/'.$row['id']) ?>">Detail</a>
-                <button type="button" class="btn ghost full send-invoice">Kirim Invoice</button>
+                <a class="btn ghost full send-invoice" href="<?= site_url('transactions/send-invoice/'.$row['id']) ?>">Kirim Invoice</a>
             </div>
         </article>
     <?php endforeach ?>

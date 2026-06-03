@@ -8,6 +8,7 @@ use CodeIgniter\Router\RouteCollection;
 $routes->get('/', 'Home::index');
 $routes->get('login', 'AuthController::login');
 $routes->get('faq', 'AuthController::faq');
+$routes->get('invoice/(:num)', 'TransactionController::publicInvoice/$1');
 $routes->post('login', 'AuthController::attemptLogin');
 $routes->post('logout', 'AuthController::logout');
 
@@ -31,6 +32,7 @@ $routes->group('', ['filter' => 'auth'], static function ($routes) {
     $routes->get('transactions', 'TransactionController::index');
     $routes->get('transactions/new', 'TransactionController::new');
     $routes->post('transactions', 'TransactionController::create');
+    $routes->get('transactions/send-invoice/(:num)', 'TransactionController::sendInvoice/$1');
     $routes->get('transactions/(:num)', 'TransactionController::show/$1');
     $routes->get('transactions/proof/(:num)', 'TransactionController::proof/$1');
     $routes->post('transactions/cancel/(:num)', 'TransactionController::cancel/$1');

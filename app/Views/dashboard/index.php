@@ -18,7 +18,7 @@ $monthSelector .= '</select><noscript><button class="btn ghost" type="submit">Ta
 <?= view('partials/page_head', [
     'eyebrow' => 'Dashboard',
     'heading' => 'Ringkasan bisnis ' . $selectedPeriodLabel,
-    'copy' => 'Data dashboard dibaca langsung dari transaksi real. Pilih All, bulan ini, atau dua bulan sebelumnya untuk melihat periode yang dibutuhkan.',
+    'copy' => 'Data dashboard dibaca langsung dari transaksi real. Pilih transaksi sepanjang waktu, bulan ini, atau dua bulan sebelumnya untuk melihat periode yang dibutuhkan.',
     'controls' => $monthSelector,
     'actions' => '<a class="btn primary" href="' . site_url('transactions/new') . '">Tambah Transaksi</a>',
 ]) ?>
@@ -39,6 +39,55 @@ $monthSelector .= '</select><noscript><button class="btn ghost" type="submit">Ta
         <?php endforeach ?>
     </section>
 <?php endif ?>
+
+<section class="panel">
+    <div class="panel-head">
+        <div>
+            <h2>Cara hitung angka</h2>
+            <p>Angka dashboard dijelaskan dengan rumus sederhana supaya owner awam tetap bisa membaca hasilnya.</p>
+        </div>
+    </div>
+    <div class="formula-grid">
+        <article class="formula-card">
+            <span>Omzet</span>
+            <strong><?= esc($businessNotes['omzet'] ?? '-') ?></strong>
+        </article>
+        <article class="formula-card">
+            <span>Profit</span>
+            <strong><?= esc($businessNotes['profit'] ?? '-') ?></strong>
+        </article>
+        <article class="formula-card">
+            <span>Cash-in</span>
+            <strong><?= esc($businessNotes['cash_in'] ?? '-') ?></strong>
+        </article>
+        <article class="formula-card">
+            <span>Pesanan</span>
+            <strong><?= esc($businessNotes['pesanan'] ?? '-') ?></strong>
+        </article>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <div>
+            <h2>Uang masuk</h2>
+            <p>Total uang masuk dibagi per metode bayar dari transaksi completed.</p>
+        </div>
+        <span class="pill">Total <?= rupiah($cashInTotal ?? 0) ?></span>
+    </div>
+    <?php if (! empty($paymentBreakdown)): ?>
+        <div class="cashin-grid">
+            <?php foreach ($paymentBreakdown as $breakdown): ?>
+                <article class="cashin-card">
+                    <span><?= esc($breakdown['label'] ?? transaction_payment_method_label((string) ($breakdown['payment_method'] ?? ''))) ?></span>
+                    <strong><?= rupiah($breakdown['total_amount']) ?></strong>
+                </article>
+            <?php endforeach ?>
+        </div>
+    <?php else: ?>
+        <div class="empty-state">Belum ada pembayaran completed yang bisa dibagi ke metode bayar.</div>
+    <?php endif ?>
+</section>
 
 <section class="panel">
     <div class="panel-head">

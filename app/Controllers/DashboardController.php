@@ -27,7 +27,9 @@ class DashboardController extends BaseController
                 $trend = $this->salesTrend($db);
                 $loyalCustomers = $this->loyalCustomers($db);
                 $latestTransactions = $this->latestTransactions($db);
-                $trendBadge = 'All';
+                $paymentBreakdown = $this->paymentBreakdown($db);
+                $cashInTotal = array_sum(array_column($paymentBreakdown, 'total_amount'));
+                $trendBadge = 'Transaksi sepanjang waktu';
             } else {
                 [$start, $end] = month_period($selectedPeriod);
                 [$comparisonStart, $comparisonEnd] = month_period(previous_month_key($selectedPeriod));
@@ -37,6 +39,8 @@ class DashboardController extends BaseController
                 $trend = $this->salesTrend($db, $start, $end);
                 $loyalCustomers = $this->loyalCustomers($db, $start, $end);
                 $latestTransactions = $this->latestTransactions($db, $start, $end);
+                $paymentBreakdown = $this->paymentBreakdown($db, $start, $end);
+                $cashInTotal = array_sum(array_column($paymentBreakdown, 'total_amount'));
                 $trendBadge = month_label(previous_month_key($selectedPeriod));
             }
 
@@ -51,6 +55,9 @@ class DashboardController extends BaseController
                 'trend' => $trend,
                 'loyalCustomers' => $loyalCustomers,
                 'latestTransactions' => $latestTransactions,
+                'paymentBreakdown' => $paymentBreakdown,
+                'cashInTotal' => $cashInTotal,
+                'businessNotes' => business_transparency_notes(),
                 'dashboardError' => null,
                 'referenceMonths' => [
                     'current' => month_label($currentMonth),
@@ -67,11 +74,14 @@ class DashboardController extends BaseController
                 'selectedPeriod' => $selectedPeriod,
                 'selectedPeriodLabel' => $selectedPeriodLabel,
                 'monthOptions' => $monthOptions,
-                'trendBadge' => $isAllPeriod ? 'All' : month_label(previous_month_key($selectedPeriod)),
+                'trendBadge' => $isAllPeriod ? 'Transaksi sepanjang waktu' : month_label(previous_month_key($selectedPeriod)),
                 'metrics' => [],
                 'trend' => [],
                 'loyalCustomers' => [],
                 'latestTransactions' => [],
+                'paymentBreakdown' => [],
+                'cashInTotal' => 0,
+                'businessNotes' => business_transparency_notes(),
                 'dashboardError' => 'Data dashboard belum bisa dimuat karena koneksi database bermasalah.',
                 'referenceMonths' => [
                     'current' => month_label($currentMonth),
@@ -152,6 +162,38 @@ class DashboardController extends BaseController
             'canceled_transactions' => (int) ($canceled['canceled_transactions'] ?? 0),
             'total_transactions' => (int) ($all['total_transactions'] ?? 0),
         ];
+    }
+
+    private function paymentBreakdown($db, ?string $start = null, ?string $end = null): array
+    {
+        $builder = $db->table('transactions')
+            ->select('payment_method, COALESCE(SUM(total),0) total_amount')
+            ->where('status', 'completed')
+            ->groupBy('payment_method')
+            ->orderBy('payment_method', 'ASC');
+
+        $rows = $this->applyDateRange($builder, $start, $end)->get()->getResultArray();
+
+        $totals = [
+            'cash' => 0.0,
+            'qris' => 0.0,
+            'transfer' => 0.0,
+        ];
+
+        foreach ($rows as $row) {
+            $method = (string) ($row['payment_method'] ?? '');
+            if (! array_key_exists($method, $totals)) {
+                continue;
+            }
+
+            $totals[$method] = (float) ($row['total_amount'] ?? 0);
+        }
+
+        return array_map(static fn (string $method): array => [
+            'payment_method' => $method,
+            'label' => transaction_payment_method_label($method),
+            'total_amount' => $totals[$method],
+        ], array_keys($totals));
     }
 
     private function salesTrend($db, ?string $start = null, ?string $end = null): array

@@ -23,13 +23,13 @@ final class MonthHelperTest extends CIUnitTestCase
 
         $selectedPeriod = dashboard_period_key('all');
         $this->assertSame('all', $selectedPeriod);
-        $this->assertSame('All', dashboard_period_label('all'));
+        $this->assertSame('Transaksi sepanjang waktu', dashboard_period_label('all'));
 
         $options = dashboard_period_options(date('Y-m'));
 
         $this->assertCount(4, $options);
         $this->assertSame('all', $options[0]['value']);
-        $this->assertSame('All', $options[0]['label']);
+        $this->assertSame('Transaksi sepanjang waktu', $options[0]['label']);
         $this->assertSame(date('Y-m'), $options[1]['value']);
         $this->assertSame(previous_month_key(date('Y-m')), $options[2]['value']);
         $this->assertSame(previous_month_key(previous_month_key(date('Y-m'))), $options[3]['value']);

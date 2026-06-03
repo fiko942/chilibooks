@@ -76,7 +76,7 @@ function month_label(string $month): string
 
 function dashboard_period_label(string $period): string
 {
-    return $period === 'all' ? 'All' : month_label($period);
+    return $period === 'all' ? 'Transaksi sepanjang waktu' : month_label($period);
 }
 
 function dashboard_period_options(string $selectedPeriod): array
@@ -149,4 +149,153 @@ function customer_whatsapp_url(?string $phone, ?string $name = null, ?string $lo
 function customer_can_contact_whatsapp(string $name, ?string $phone): bool
 {
     return mb_strlen(trim($name)) >= 3 && is_valid_indonesian_phone($phone);
+}
+
+function format_indonesian_datetime(?string $value): string
+{
+    if (empty($value)) {
+        return '-';
+    }
+
+    $time = strtotime($value);
+
+    if ($time === false) {
+        return '-';
+    }
+
+    $months = [
+        '01' => 'Januari',
+        '02' => 'Februari',
+        '03' => 'Maret',
+        '04' => 'April',
+        '05' => 'Mei',
+        '06' => 'Juni',
+        '07' => 'Juli',
+        '08' => 'Agustus',
+        '09' => 'September',
+        '10' => 'Oktober',
+        '11' => 'November',
+        '12' => 'Desember',
+    ];
+
+    $day = date('d', $time);
+    $month = $months[date('m', $time)] ?? date('m', $time);
+    $year = date('Y', $time);
+    $clock = date('H:i', $time);
+
+    return $day . ' ' . $month . ' ' . $year . ', ' . $clock;
+}
+
+function format_indonesian_date(?string $value): string
+{
+    if (empty($value)) {
+        return '-';
+    }
+
+    $time = strtotime($value);
+
+    if ($time === false) {
+        return '-';
+    }
+
+    $months = [
+        '01' => 'Januari',
+        '02' => 'Februari',
+        '03' => 'Maret',
+        '04' => 'April',
+        '05' => 'Mei',
+        '06' => 'Juni',
+        '07' => 'Juli',
+        '08' => 'Agustus',
+        '09' => 'September',
+        '10' => 'Oktober',
+        '11' => 'November',
+        '12' => 'Desember',
+    ];
+
+    return date('d', $time) . ' ' . ($months[date('m', $time)] ?? date('m', $time)) . ' ' . date('Y', $time);
+}
+
+function report_period_label(string $start, string $end): string
+{
+    return format_indonesian_date($start) . ' - ' . format_indonesian_date($end);
+}
+
+function transaction_public_invoice_url(int $transactionId): string
+{
+    return site_url('invoice/' . $transactionId);
+}
+
+function transaction_invoice_message(array $transaction, array $customer, array $items, string $invoiceUrl): string
+{
+    $lines = [
+        'Terima kasih telah berlangganan, ' . trim((string) ($customer['name'] ?? 'Pelanggan')) . '.',
+        'Berikut invoice Chili Oil Gen Z untuk pesanan ' . trim((string) ($transaction['invoice'] ?? '-')) . '.',
+        '',
+        'Nama: ' . trim((string) ($customer['name'] ?? '-')),
+        'Pesanan: ' . trim((string) ($transaction['invoice'] ?? '-')),
+        'Tanggal: ' . format_indonesian_datetime((string) ($transaction['transaction_date'] ?? null)),
+        'Dibayar: ' . format_indonesian_datetime((string) ($transaction['paid_at'] ?? null)),
+        'Metode bayar: ' . transaction_payment_method_label((string) ($transaction['payment_method'] ?? '')),
+        'Tipe pesanan: ' . transaction_delivery_label((string) ($transaction['delivery_type'] ?? '')),
+        'Produk:',
+    ];
+
+    foreach ($items as $item) {
+        $lines[] = '- ' . trim((string) ($item['product_name'] ?? '-')) . ' x' . (int) ($item['qty'] ?? 0);
+    }
+
+    $lines[] = 'Total: ' . rupiah($transaction['total'] ?? 0);
+    $lines[] = 'Lihat invoice: ' . $invoiceUrl;
+
+    return implode("\n", $lines);
+}
+
+function transaction_invoice_whatsapp_url(array $transaction, array $customer, array $items, string $invoiceUrl): ?string
+{
+    $phone = normalize_indonesian_phone((string) ($customer['phone'] ?? ''));
+
+    if (! is_valid_indonesian_phone($phone)) {
+        return null;
+    }
+
+    $message = transaction_invoice_message($transaction, $customer, $items, $invoiceUrl);
+
+    return 'https://wa.me/' . ltrim($phone, '+') . '?text=' . rawurlencode($message);
+}
+
+function transaction_payment_method_label(string $method): string
+{
+    return match ($method) {
+        'cash' => 'Cash',
+        'qris' => 'QRIS',
+        'transfer' => 'Transfer',
+        default => '-',
+    };
+}
+
+function transaction_delivery_label(string $deliveryType): string
+{
+    return $deliveryType === 'diambil_di_tempat' ? 'Diambil di tempat' : 'Diantar';
+}
+
+function business_transparency_notes(): array
+{
+    return [
+        'omzet' => 'Omzet = total transaksi completed pada periode terpilih.',
+        'profit' => 'Profit = total jual - modal dari transaksi completed.',
+        'cash_in' => 'Cash-in = uang masuk per metode bayar dari transaksi completed.',
+        'pesanan' => 'Pesanan = transaksi completed yang selesai dibayar dan siap dihitung sebagai penjualan.',
+    ];
+}
+
+function transaction_audit_label(string $eventType): string
+{
+    return match ($eventType) {
+        'created' => 'Dibuat',
+        'updated' => 'Diubah',
+        'canceled' => 'Dibatalkan',
+        'stock_adjusted' => 'Stok disesuaikan',
+        default => ucfirst(str_replace('_', ' ', $eventType)),
+    };
 }

@@ -5,9 +5,11 @@ namespace App\Controllers;
 use App\Models\CustomerModel;
 use App\Models\ProductModel;
 use App\Models\StockMovementModel;
+use App\Models\TransactionAuditModel;
 use App\Models\TransactionItemModel;
 use App\Models\TransactionModel;
 use CodeIgniter\Database\Exceptions\DatabaseException;
+use CodeIgniter\Exceptions\PageNotFoundException;
 use DateTimeImmutable;
 use Throwable;
 
@@ -153,6 +155,7 @@ class TransactionController extends BaseController
 
             $subtotal = 0.0;
             $profit = 0.0;
+            $paidAt = $status === 'completed' ? date('Y-m-d H:i:s') : null;
 
             foreach ($items as $item) {
                 $subtotal += $item['lineSubtotal'];
@@ -181,6 +184,7 @@ class TransactionController extends BaseController
                 'payment_method' => $paymentMethod,
                 'payment_proof_path' => $paymentProofPath,
                 'delivery_type' => $deliveryType,
+                'paid_at' => $paidAt,
                 'notes' => $notes,
             ], true);
 
@@ -213,6 +217,32 @@ class TransactionController extends BaseController
                 }
             }
 
+            $this->recordTransactionAudit(
+                (int) $transactionId,
+                'created',
+                null,
+                $this->transactionAuditSnapshot(
+                    $transactionId,
+                    $customerId,
+                    $transactionDate,
+                    $status,
+                    $subtotal,
+                    $discount,
+                    $extraFee,
+                    $total,
+                    $profit,
+                    $paymentMethod,
+                    $deliveryType,
+                    $paidAt,
+                    $notes,
+                    $items,
+                    $status === 'completed'
+                ),
+                $status === 'completed'
+                    ? 'Transaksi baru disimpan dan stok diperbarui.'
+                    : 'Transaksi baru disimpan tanpa penyesuaian stok.'
+            );
+
             $db->transComplete();
 
             if (! $db->transStatus()) {
@@ -237,6 +267,41 @@ class TransactionController extends BaseController
         return redirect()->to('/transactions/' . $transactionId)->with('success', 'Transaksi berhasil disimpan.');
     }
 
+    public function sendInvoice(int $id)
+    {
+        $bundle = $this->loadInvoiceBundle($id);
+
+        if ($bundle === null) {
+            return redirect()->to('/transactions/' . $id)->with('error', 'Invoice tidak ditemukan.');
+        }
+
+        $invoiceUrl = transaction_public_invoice_url($id);
+        $whatsappUrl = transaction_invoice_whatsapp_url($bundle['transaction'], $bundle['customer'], $bundle['items'], $invoiceUrl);
+
+        if ($whatsappUrl === null) {
+            return redirect()->to('/transactions/' . $id)->with('error', 'Nomor WhatsApp pelanggan belum valid.');
+        }
+
+        return redirect()->to($whatsappUrl);
+    }
+
+    public function publicInvoice(int $id)
+    {
+        $bundle = $this->loadInvoiceBundle($id);
+
+        if ($bundle === null) {
+            throw PageNotFoundException::forPageNotFound();
+        }
+
+        return view('invoices/public', [
+            'title' => 'Invoice ' . ($bundle['transaction']['invoice'] ?? ''),
+            'transaction' => $bundle['transaction'],
+            'customer' => $bundle['customer'],
+            'items' => $bundle['items'],
+            'invoiceUrl' => transaction_public_invoice_url($id),
+        ]);
+    }
+
     public function show(int $id)
     {
         $transaction = db_connect()->table('transactions t')
@@ -251,7 +316,29 @@ class TransactionController extends BaseController
             ->where('ti.transaction_id', $id)
             ->get()->getResultArray();
 
-        return view('transactions/show', ['title' => 'Detail Transaksi', 'active' => 'transactions', 'transaction' => $transaction, 'items' => $items]);
+        $audits = [];
+        try {
+            $audits = db_connect()->table('transaction_audits')
+                ->where('transaction_id', $id)
+                ->orderBy('id', 'DESC')
+                ->get()->getResultArray();
+        } catch (DatabaseException $exception) {
+            log_message('error', 'Transaction audit load failed: {message}', ['message' => $exception->getMessage()]);
+        }
+
+        foreach ($audits as &$audit) {
+            $audit['before_payload'] = $this->decodeAuditPayload($audit['before_payload'] ?? null);
+            $audit['after_payload'] = $this->decodeAuditPayload($audit['after_payload'] ?? null);
+        }
+        unset($audit);
+
+        return view('transactions/show', [
+            'title' => 'Detail Transaksi',
+            'active' => 'transactions',
+            'transaction' => $transaction,
+            'items' => $items,
+            'transactionAudits' => $audits,
+        ]);
     }
 
     public function proof(int $id)
@@ -288,6 +375,7 @@ class TransactionController extends BaseController
             $productModel = new ProductModel();
             $movementModel = new StockMovementModel();
             $items = (new TransactionItemModel())->where('transaction_id', $id)->findAll();
+            $stockChanges = [];
 
             foreach ($items as $item) {
                 $product = $productModel->find((int) $item['product_id']);
@@ -295,6 +383,7 @@ class TransactionController extends BaseController
                     continue;
                 }
 
+                $beforeStock = (int) $product['stock'];
                 $newStock = (int) $product['stock'] + (int) $item['qty'];
                 $productModel->update($product['id'], ['stock' => $newStock, 'status' => $newStock <= 10 ? 'low' : 'active']);
                 $movementModel->insert([
@@ -304,9 +393,39 @@ class TransactionController extends BaseController
                     'qty' => (int) $item['qty'],
                     'notes' => 'Pengembalian stok karena transaksi dibatalkan',
                 ]);
+
+                $stockChanges[] = [
+                    'product_id' => (int) $product['id'],
+                    'product_name' => (string) ($product['name'] ?? ''),
+                    'qty' => (int) $item['qty'],
+                    'stock_before' => $beforeStock,
+                    'stock_after' => $newStock,
+                ];
             }
 
             (new TransactionModel())->update($id, ['status' => 'canceled', 'total' => 0, 'profit' => 0]);
+
+            $this->recordTransactionAudit(
+                $id,
+                'canceled',
+                [
+                    'transaction_id' => $id,
+                    'status' => (string) ($transaction['status'] ?? 'completed'),
+                    'total' => (float) ($transaction['total'] ?? 0),
+                    'profit' => (float) ($transaction['profit'] ?? 0),
+                    'payment_method' => (string) ($transaction['payment_method'] ?? ''),
+                    'delivery_type' => (string) ($transaction['delivery_type'] ?? ''),
+                    'stock_changes' => [],
+                ],
+                [
+                    'transaction_id' => $id,
+                    'status' => 'canceled',
+                    'total' => 0,
+                    'profit' => 0,
+                    'stock_changes' => $stockChanges,
+                ],
+                'Transaksi dibatalkan dan stok dikembalikan.'
+            );
         }
 
         return redirect()->to('/transactions/' . $id)->with('success', 'Transaksi ditandai dibatalkan.');
@@ -390,5 +509,158 @@ class TransactionController extends BaseController
         $parsed = DateTimeImmutable::createFromFormat('Y-m-d', $date);
 
         return $parsed instanceof DateTimeImmutable && $parsed->format('Y-m-d') === $date;
+    }
+
+    private function loadInvoiceBundle(int $id): ?array
+    {
+        try {
+            $transaction = db_connect()->table('transactions t')
+                ->select('t.*, c.name customer_name, c.phone customer_phone, c.location customer_location')
+                ->join('customers c', 'c.id = t.customer_id')
+                ->where('t.id', $id)
+                ->get()->getRowArray();
+
+            if (! $transaction) {
+                return null;
+            }
+
+            $items = db_connect()->table('transaction_items ti')
+                ->select('ti.*, p.name product_name')
+                ->join('products p', 'p.id = ti.product_id')
+                ->where('ti.transaction_id', $id)
+                ->orderBy('ti.id', 'ASC')
+                ->get()->getResultArray();
+
+            return [
+                'transaction' => $transaction,
+                'customer' => [
+                    'name' => $transaction['customer_name'] ?? '',
+                    'phone' => $transaction['customer_phone'] ?? '',
+                    'location' => $transaction['customer_location'] ?? '',
+                ],
+                'items' => $items,
+            ];
+        } catch (DatabaseException $exception) {
+            log_message('error', 'Invoice load failed: {message}', ['message' => $exception->getMessage()]);
+
+            return null;
+        }
+    }
+
+    private function loadTransactionAuditSnapshot(int $id): ?array
+    {
+        try {
+            $transaction = db_connect()->table('transactions t')
+                ->select('t.*, c.name customer_name')
+                ->join('customers c', 'c.id = t.customer_id')
+                ->where('t.id', $id)
+                ->get()->getRowArray();
+
+            if (! $transaction) {
+                return null;
+            }
+
+            $items = db_connect()->table('transaction_items ti')
+                ->select('ti.*, p.name product_name')
+                ->join('products p', 'p.id = ti.product_id')
+                ->where('ti.transaction_id', $id)
+                ->orderBy('ti.id', 'ASC')
+                ->get()->getResultArray();
+
+            return [
+                'transaction' => $transaction,
+                'items' => $items,
+            ];
+        } catch (DatabaseException $exception) {
+            log_message('error', 'Audit snapshot load failed: {message}', ['message' => $exception->getMessage()]);
+
+            return null;
+        }
+    }
+
+    private function transactionAuditSnapshot(
+        int $transactionId,
+        int $customerId,
+        string $transactionDate,
+        string $status,
+        float $subtotal,
+        float $discount,
+        float $extraFee,
+        float $total,
+        float $profit,
+        string $paymentMethod,
+        string $deliveryType,
+        ?string $paidAt,
+        string $notes,
+        array $items,
+        bool $includeStockChanges
+    ): array {
+        $stockChanges = [];
+
+        if ($includeStockChanges) {
+            foreach ($items as $item) {
+                $product = $item['product'] ?? [];
+                $beforeStock = (int) ($product['stock'] ?? 0);
+                $afterStock = max(0, $beforeStock - (int) ($item['qty'] ?? 0));
+
+                $stockChanges[] = [
+                    'product_id' => (int) ($product['id'] ?? 0),
+                    'product_name' => (string) ($product['name'] ?? ''),
+                    'qty' => (int) ($item['qty'] ?? 0),
+                    'stock_before' => $beforeStock,
+                    'stock_after' => $afterStock,
+                ];
+            }
+        }
+
+        return [
+            'transaction_id' => $transactionId,
+            'customer_id' => $customerId,
+            'transaction_date' => $transactionDate,
+            'status' => $status,
+            'subtotal' => $subtotal,
+            'discount' => $discount,
+            'extra_fee' => $extraFee,
+            'total' => $total,
+            'profit' => $profit,
+            'payment_method' => $paymentMethod,
+            'delivery_type' => $deliveryType,
+            'paid_at' => $paidAt,
+            'notes' => $notes,
+            'stock_changes' => $stockChanges,
+        ];
+    }
+
+    private function recordTransactionAudit(
+        int $transactionId,
+        string $eventType,
+        ?array $beforePayload,
+        ?array $afterPayload,
+        ?string $notes = null
+    ): void {
+        try {
+            (new TransactionAuditModel())->insert([
+                'transaction_id' => $transactionId,
+                'event_type' => $eventType,
+                'actor_user_id' => (int) (session('user_id') ?? 0) ?: null,
+                'actor_name' => trim((string) (session('user_name') ?? 'Owner')) ?: 'Owner',
+                'before_payload' => $beforePayload === null ? null : json_encode($beforePayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                'after_payload' => $afterPayload === null ? null : json_encode($afterPayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                'notes' => $notes,
+            ]);
+        } catch (Throwable $exception) {
+            log_message('error', 'Transaction audit save failed: {message}', ['message' => $exception->getMessage()]);
+        }
+    }
+
+    private function decodeAuditPayload(?string $payload): ?array
+    {
+        if (empty($payload)) {
+            return null;
+        }
+
+        $decoded = json_decode($payload, true);
+
+        return is_array($decoded) ? $decoded : null;
     }
 }

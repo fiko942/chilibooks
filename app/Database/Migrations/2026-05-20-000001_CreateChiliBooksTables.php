@@ -62,6 +62,7 @@ class CreateChiliBooksTables extends Migration
             'payment_method' => ['type' => 'VARCHAR', 'constraint' => 30, 'default' => 'cash'],
             'payment_proof_path' => ['type' => 'VARCHAR', 'constraint' => 255, 'null' => true],
             'delivery_type' => ['type' => 'VARCHAR', 'constraint' => 30, 'default' => 'diantar'],
+            'paid_at' => ['type' => 'DATETIME', 'null' => true],
             'notes' => ['type' => 'TEXT', 'null' => true],
             'created_at' => ['type' => 'DATETIME', 'null' => true],
             'updated_at' => ['type' => 'DATETIME', 'null' => true],
