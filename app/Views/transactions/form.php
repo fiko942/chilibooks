@@ -82,6 +82,9 @@ $displayedDate = $dateLabel->format('d') . ' ' . month_label($dateLabel->format(
                     <select id="customer_id" name="customer_id" class="field-select" required>
                         <?= $customerOptions ?>
                     </select>
+                    <div class="field-note">
+                        <a class="link-action" href="<?= site_url('customers/new') ?>">Tambah pelanggan</a>
+                    </div>
                 </div>
 
                 <div class="field">

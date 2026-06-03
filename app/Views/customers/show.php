@@ -4,9 +4,9 @@
 <section class="panel">
     <form method="post" action="<?= site_url('customers/update/'.$customer['id']) ?>">
         <?= csrf_field() ?>
-        <label>Nama</label><input name="name" value="<?= esc($customer['name']) ?>" required>
-        <label>Lokasi</label><input name="location" value="<?= esc($customer['location']) ?>">
-        <label>Kontak</label><input name="phone" value="<?= esc($customer['phone']) ?>">
+        <label>Nama</label><input name="name" value="<?= esc(old('name', $customer['name'])) ?>" required minlength="3">
+        <label>Lokasi</label><input name="location" value="<?= esc(old('location', $customer['location'])) ?>">
+        <label>Kontak</label><input name="phone" value="<?= esc(old('phone', $customer['phone'])) ?>">
         <button class="primary full">Simpan Perubahan</button>
     </form>
 </section>

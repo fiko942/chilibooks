@@ -100,3 +100,53 @@ function dashboard_period_options(string $selectedPeriod): array
         ];
     }, $periods);
 }
+
+function normalize_indonesian_phone(?string $phone): string
+{
+    $digits = preg_replace('/\D+/', '', trim((string) $phone));
+
+    if ($digits === '') {
+        return '';
+    }
+
+    if (str_starts_with($digits, '62')) {
+        return '+' . $digits;
+    }
+
+    if (str_starts_with($digits, '0')) {
+        return '+62' . substr($digits, 1);
+    }
+
+    return '+62' . $digits;
+}
+
+function is_valid_indonesian_phone(?string $phone): bool
+{
+    return preg_match('/^\+62\d{8,13}$/', normalize_indonesian_phone($phone)) === 1;
+}
+
+function customer_whatsapp_url(?string $phone, ?string $name = null, ?string $location = null): ?string
+{
+    if (! is_valid_indonesian_phone($phone)) {
+        return null;
+    }
+
+    $messageParts = ['Halo, saya ingin menindaklanjuti data pelanggan'];
+
+    if ($name !== null && trim($name) !== '') {
+        $messageParts[] = 'untuk ' . trim($name);
+    }
+
+    if ($location !== null && trim($location) !== '') {
+        $messageParts[] = 'lokasi ' . trim($location);
+    }
+
+    $text = rawurlencode(trim(implode(' ', $messageParts)) . '.');
+
+    return 'https://wa.me/' . ltrim(normalize_indonesian_phone($phone), '+') . '?text=' . $text;
+}
+
+function customer_can_contact_whatsapp(string $name, ?string $phone): bool
+{
+    return mb_strlen(trim($name)) >= 3 && is_valid_indonesian_phone($phone);
+}

@@ -22,6 +22,7 @@ $routes->group('', ['filter' => 'auth'], static function ($routes) {
     $routes->post('products/delete/(:num)', 'ProductController::delete/$1');
 
     $routes->get('customers', 'CustomerController::index');
+    $routes->get('customers/new', 'CustomerController::new');
     $routes->get('customers/(:num)', 'CustomerController::show/$1');
     $routes->post('customers', 'CustomerController::create');
     $routes->post('customers/update/(:num)', 'CustomerController::update/$1');

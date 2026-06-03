@@ -355,6 +355,51 @@ button {
   margin-bottom: 12px;
 }
 
+.customer-card {
+  padding: 14px;
+}
+
+.customer-actions {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.customer-whatsapp {
+  color: var(--leaf);
+}
+
+.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.customer-form {
+  display: grid;
+  gap: 10px;
+}
+
+.customer-form-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin-top: 4px;
+}
+
+.field-note {
+  margin-top: 6px;
+}
+
+.link-action {
+  color: var(--chili);
+  font-size: 13px;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.link-action:hover {
+  text-decoration: underline;
+}
+
 .meta {
   display: flex;
   justify-content: space-between;
@@ -813,6 +858,11 @@ textarea {
   }
 
   .transaction-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .customer-actions,
+  .customer-form-actions {
     grid-template-columns: 1fr;
   }
 }
