@@ -31,6 +31,7 @@ $routes->group('', ['filter' => 'auth'], static function ($routes) {
     $routes->get('transactions/new', 'TransactionController::new');
     $routes->post('transactions', 'TransactionController::create');
     $routes->get('transactions/(:num)', 'TransactionController::show/$1');
+    $routes->get('transactions/proof/(:num)', 'TransactionController::proof/$1');
     $routes->post('transactions/cancel/(:num)', 'TransactionController::cancel/$1');
 
     $routes->get('reports', 'ReportController::index');

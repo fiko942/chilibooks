@@ -3,7 +3,13 @@
 <?= view('partials/page_head', ['eyebrow' => 'Detail Transaksi', 'heading' => $transaction['invoice'] ?? 'Transaksi', 'copy' => 'Snapshot harga menjaga integritas histori.']) ?>
 <section class="panel">
     <div class="amount"><span>Pelanggan</span><b><?= esc($transaction['customer_name']) ?></b></div>
+    <div class="amount"><span>Tanggal</span><b><?= esc($transaction['transaction_date']) ?></b></div>
     <div class="amount"><span>Status</span><b><?= esc($transaction['status']) ?></b></div>
+    <div class="amount"><span>Metode bayar</span><b><?= esc(strtoupper((string) ($transaction['payment_method'] ?? 'cash'))) ?></b></div>
+    <div class="amount"><span>Pengantaran</span><b><?= esc($transaction['delivery_type'] === 'diambil_di_tempat' ? 'Diambil di tempat' : 'Diantar') ?></b></div>
+    <?php if (! empty($transaction['payment_proof_path'])): ?>
+        <div class="amount"><span>Bukti bayar</span><b><a href="<?= site_url('transactions/proof/' . $transaction['id']) ?>" target="_blank" rel="noopener">Lihat bukti</a></b></div>
+    <?php endif ?>
     <div class="amount"><span>Subtotal</span><b><?= rupiah($transaction['subtotal']) ?></b></div>
     <div class="amount"><span>Diskon</span><b>- <?= rupiah($transaction['discount']) ?></b></div>
     <div class="amount"><span>Biaya tambahan</span><b><?= rupiah($transaction['extra_fee']) ?></b></div>

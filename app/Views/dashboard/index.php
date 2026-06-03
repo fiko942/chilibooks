@@ -1,5 +1,4 @@
 <?php
-
 $monthSelector = '<form class="month-picker" method="get" action="' . site_url('dashboard') . '">
     <label for="dashboard-month">Periode</label>
     <select id="dashboard-month" name="month" onchange="this.form.submit()">';
@@ -18,10 +17,10 @@ $monthSelector .= '</select><noscript><button class="btn ghost" type="submit">Ta
 <?php endif ?>
 <?= view('partials/page_head', [
     'eyebrow' => 'Dashboard',
-    'heading' => 'Ringkasan bisnis ' . $selectedMonthLabel,
-    'copy' => 'Data dashboard dibaca langsung dari transaksi real. Pilih bulan lain untuk membandingkan periode sebelumnya.',
+    'heading' => 'Ringkasan bisnis ' . $selectedPeriodLabel,
+    'copy' => 'Data dashboard dibaca langsung dari transaksi real. Pilih All, bulan ini, atau dua bulan sebelumnya untuk melihat periode yang dibutuhkan.',
     'controls' => $monthSelector,
-    'actions' => '<a class="btn primary" href="'.site_url('transactions/new').'">Tambah Transaksi</a>',
+    'actions' => '<a class="btn primary" href="' . site_url('transactions/new') . '">Tambah Transaksi</a>',
 ]) ?>
 
 <?php if (empty($metrics)): ?>
@@ -45,9 +44,9 @@ $monthSelector .= '</select><noscript><button class="btn ghost" type="submit">Ta
     <div class="panel-head">
         <div>
             <h2>Tren penjualan</h2>
-            <p><?= esc($selectedMonthLabel) ?> dibandingkan bucket harian dalam bulan tersebut.</p>
+            <p><?= esc($selectedPeriodLabel) ?> dibaca dari bucket harian yang diringkas agar tetap nyaman di mobile.</p>
         </div>
-        <span class="pill"><?= esc($previousMonthLabel) ?></span>
+        <?php if (! empty($trendBadge)): ?><span class="pill"><?= esc($trendBadge) ?></span><?php endif ?>
     </div>
     <?php if (! empty($trend)): ?>
         <div class="chart">
@@ -91,7 +90,7 @@ $monthSelector .= '</select><noscript><button class="btn ghost" type="submit">Ta
     <div class="panel-head">
         <div>
             <h2>Transaksi terbaru</h2>
-            <p>Status selesai dan dibatalkan di periode terpilih.</p>
+            <p>Urutan transaksi terbaru dalam periode terpilih.</p>
         </div>
     </div>
     <?php if (! empty($latestTransactions)): ?>

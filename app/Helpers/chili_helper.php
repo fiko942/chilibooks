@@ -31,6 +31,15 @@ function month_key(?string $month): string
     return date('Y-m');
 }
 
+function dashboard_period_key(?string $period): string
+{
+    if ($period === 'all') {
+        return 'all';
+    }
+
+    return month_key($period);
+}
+
 function previous_month_key(string $month): string
 {
     return (new DateTimeImmutable($month . '-01'))->modify('-1 month')->format('Y-m');
@@ -63,4 +72,31 @@ function month_label(string $month): string
     [$year, $monthNumber] = explode('-', $month);
 
     return ($labels[$monthNumber] ?? $monthNumber) . ' ' . $year;
+}
+
+function dashboard_period_label(string $period): string
+{
+    return $period === 'all' ? 'All' : month_label($period);
+}
+
+function dashboard_period_options(string $selectedPeriod): array
+{
+    $currentMonth = date('Y-m');
+    $previousMonth = previous_month_key($currentMonth);
+    $twoMonthsAgo = previous_month_key($previousMonth);
+
+    $periods = array_values(array_unique([
+        'all',
+        $currentMonth,
+        $previousMonth,
+        $twoMonthsAgo,
+    ]));
+
+    return array_map(static function (string $period) use ($selectedPeriod): array {
+        return [
+            'value' => $period,
+            'label' => dashboard_period_label($period),
+            'selected' => $period === $selectedPeriod,
+        ];
+    }, $periods);
 }
