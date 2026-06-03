@@ -2,7 +2,7 @@
 
 namespace Config;
 
-use CodeIgniter\Config\Filters as BaseFilters;
+use CodeIgniter\Config\BaseConfig;
 use CodeIgniter\Filters\Cors;
 use CodeIgniter\Filters\CSRF;
 use CodeIgniter\Filters\DebugToolbar;
@@ -14,7 +14,7 @@ use CodeIgniter\Filters\PerformanceMetrics;
 use CodeIgniter\Filters\SecureHeaders;
 use App\Filters\AuthFilter;
 
-class Filters extends BaseFilters
+class Filters extends BaseConfig
 {
     /**
      * Configures aliases for Filter classes to

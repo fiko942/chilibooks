@@ -15,6 +15,15 @@ class AuthController extends BaseController
         return view('auth/login');
     }
 
+    public function faq()
+    {
+        if (session('user_id')) {
+            return redirect()->to('/dashboard');
+        }
+
+        return view('auth/faq');
+    }
+
     public function attemptLogin()
     {
         $user = (new UserModel())->where('email', $this->request->getPost('email'))->first();

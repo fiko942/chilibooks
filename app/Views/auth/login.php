@@ -25,6 +25,7 @@
             <button class="primary full">Masuk Dashboard</button>
             <p class="helper">Default: owner@chilioilgenz.id / officer123</p>
         </form>
+        <a class="faq-link" href="<?= site_url('faq') ?>">FAQ</a>
     </section>
 </main>
 <?= $this->endSection() ?>
